@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, Response
 import csv
 import io
+from datetime import datetime, timezone
 from app import db
 from app.models import Asset
 
@@ -99,10 +100,11 @@ def export_assets():
             ]
         )
 
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return Response(
         output.getvalue(),
         mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=assets.csv"},
+        headers={"Content-Disposition": f"attachment; filename=assets-{today}.csv"},
     )
 
 

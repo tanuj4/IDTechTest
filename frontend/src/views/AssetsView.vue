@@ -9,6 +9,7 @@ const currentPage = ref(1)
 const totalPages = ref(1)
 const search = ref('')
 const loading = ref(false)
+const exporting = ref(false)
 const error = ref(null)
 
 const formatDate = (dateStr) => dateStr ? dateStr.split('T')[0] : 'N/A'
@@ -36,6 +37,25 @@ const fetchAssets = async () => {
     console.error(err)
   } finally {
     loading.value = false
+  }
+}
+
+const handleExport = async () => {
+  exporting.value = true
+  try {
+    const response = await fetch(exportUrl.value)
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const today = new Date().toISOString().split('T')[0]
+    a.download = `assets-${today}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Export failed:', err)
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -73,13 +93,15 @@ onMounted(fetchAssets)
       <router-link to="/assets/new" class="btn btn-primary ms-auto">
         <i class="bi bi-plus-lg me-1"></i>Add Asset
       </router-link>
-      <a
-        :href="exportUrl"
-        class="btn btn-outline-secondary ms-2"
-        download
+      <button
+        class="btn btn-success ms-2"
+        :disabled="total === 0 || exporting"
+        @click="handleExport"
       >
-        <i class="bi bi-download me-1"></i>Export CSV
-      </a>
+        <span v-if="exporting" class="spinner-border spinner-border-sm me-1"></span>
+        <i v-else class="bi bi-download me-1"></i>
+        {{ exporting ? 'Exporting…' : 'Export CSV' }}
+      </button>
     </div>
 
     <!-- Search -->

@@ -3,6 +3,10 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAssets, toggleAsset, deleteAsset } from '../api/index.js'
 import AssetTable from '../components/AssetTable.vue'
+import ToastNotification from '../components/ToastNotification.vue'
+import ConfirmModal from '../components/ConfirmModal.vue'
+import { useToast } from '../composables/useToast.js'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,6 +21,9 @@ const filterStatus = ref(route.query.status || '')
 const loading = ref(false)
 const exporting = ref(false)
 const error = ref(null)
+
+const { toast, showToast, closeToast } = useToast()
+const { confirmModal, showConfirm, handleConfirm, cancelConfirm } = useConfirm()
 
 const assetTypes = ['workstation', 'server', 'network', 'peripheral']
 const statuses = ['active', 'inactive', 'retired']
@@ -89,13 +96,23 @@ const handleExport = async () => {
 
 const handleToggle = async (asset) => {
   await toggleAsset(asset.id)
+  const newStatus = asset.status === 'active' ? 'inactive' : 'active'
+  showToast(`${asset.name} marked as ${newStatus}`)
   fetchAssets()
 }
 
 const handleDelete = async (asset) => {
-  if (!confirm(`Delete "${asset.name}"? This cannot be undone.`)) return
-  await deleteAsset(asset.id)
-  fetchAssets()
+  showConfirm({
+    title: 'Delete Asset',
+    message: `Permanently delete "${asset.name}"? This cannot be undone.`,
+    confirmText: 'Delete',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      await deleteAsset(asset.id)
+      showToast(`${asset.name} deleted`, 'warning')
+      fetchAssets()
+    },
+  })
 }
 
 const goToPage = (page) => {
@@ -103,7 +120,17 @@ const goToPage = (page) => {
   fetchAssets()
 }
 
-watch([search, filterType, filterStatus], () => {
+let searchTimeout = null
+
+watch(search, () => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1
+    fetchAssets()
+  }, 300)
+})
+
+watch([filterType, filterStatus], () => {
   currentPage.value = 1
   fetchAssets()
 })
@@ -213,5 +240,22 @@ onMounted(fetchAssets)
         </li>
       </ul>
     </nav>
+
+    <ToastNotification
+      :show="toast.show"
+      :message="toast.message"
+      :type="toast.type"
+      @close="closeToast"
+    />
+
+    <ConfirmModal
+      :show="confirmModal.show"
+      :title="confirmModal.title"
+      :message="confirmModal.message"
+      :confirm-text="confirmModal.confirmText"
+      :confirm-class="confirmModal.confirmClass"
+      @confirm="handleConfirm"
+      @cancel="cancelConfirm"
+    />
   </div>
 </template>

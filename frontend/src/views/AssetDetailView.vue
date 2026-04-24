@@ -3,6 +3,10 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAsset, getAssetAudit, toggleAsset, decommissionAsset, deleteAsset } from '../api/index.js'
 import StatusBadge from '../components/StatusBadge.vue'
+import ToastNotification from '../components/ToastNotification.vue'
+import ConfirmModal from '../components/ConfirmModal.vue'
+import { useToast } from '../composables/useToast.js'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -10,6 +14,9 @@ const asset = ref(null)
 const auditLogs = ref([])
 const loading = ref(true)
 const error = ref(null)
+
+const { toast, showToast, closeToast } = useToast()
+const { confirmModal, showConfirm, handleConfirm, cancelConfirm } = useConfirm()
 
 const loadAsset = async () => {
   loading.value = true
@@ -25,20 +32,37 @@ const loadAsset = async () => {
 }
 
 const handleToggle = async () => {
+  const newStatus = asset.value.status === 'active' ? 'inactive' : 'active'
   await toggleAsset(asset.value.id)
+  showToast(`${asset.value.name} marked as ${newStatus}`)
   loadAsset()
 }
 
 const handleDecommission = async () => {
-  if (!confirm('Mark this asset as retired? This should only be done when the device is being removed from service.')) return
-  await decommissionAsset(asset.value.id)
-  loadAsset()
+  showConfirm({
+    title: 'Decommission Asset',
+    message: 'Mark this asset as retired? This should only be done when the device is being removed from service.',
+    confirmText: 'Decommission',
+    confirmClass: 'btn-warning',
+    onConfirm: async () => {
+      await decommissionAsset(asset.value.id)
+      showToast(`${asset.value.name} decommissioned`, 'warning')
+      loadAsset()
+    },
+  })
 }
 
 const handleDelete = async () => {
-  if (!confirm(`Permanently delete "${asset.value.name}"?`)) return
-  await deleteAsset(asset.value.id)
-  router.push('/assets')
+  showConfirm({
+    title: 'Delete Asset',
+    message: `Permanently delete "${asset.value.name}"? This cannot be undone.`,
+    confirmText: 'Delete',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      await deleteAsset(asset.value.id)
+      router.push('/assets')
+    },
+  })
 }
 
 const formatDate = (iso) => {
@@ -165,5 +189,22 @@ onMounted(loadAsset)
         </button>
       </div>
     </div>
+
+    <ToastNotification
+      :show="toast.show"
+      :message="toast.message"
+      :type="toast.type"
+      @close="closeToast"
+    />
+
+    <ConfirmModal
+      :show="confirmModal.show"
+      :title="confirmModal.title"
+      :message="confirmModal.message"
+      :confirm-text="confirmModal.confirmText"
+      :confirm-class="confirmModal.confirmClass"
+      @confirm="handleConfirm"
+      @cancel="cancelConfirm"
+    />
   </div>
 </template>

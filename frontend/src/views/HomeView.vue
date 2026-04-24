@@ -123,7 +123,7 @@ onMounted(async () => {
               <i class="bi bi-building display-4 text-secondary mb-3 d-block"></i>
               <h5>Manage Clients</h5>
               <p class="text-muted">Browse client organizations and their associated assets.</p>
-              <router-link to="/clients" class="btn btn-outline-secondary">
+              <router-link to="/clients" class="btn btn-primary">
                 <i class="bi bi-arrow-right me-1"></i>Go to Clients
               </router-link>
             </div>

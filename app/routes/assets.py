@@ -17,6 +17,26 @@ def list_assets():
     asset_type = request.args.get("type", "").strip()
     status = request.args.get("status", "").strip()
 
+    if asset_type and asset_type not in VALID_ASSET_TYPES:
+        return (
+            jsonify(
+                {
+                    "error": f"Invalid type filter. Must be one of: {', '.join(sorted(VALID_ASSET_TYPES))}"
+                }
+            ),
+            400,
+        )
+
+    if status and status not in VALID_STATUSES:
+        return (
+            jsonify(
+                {
+                    "error": f"Invalid status filter. Must be one of: {', '.join(sorted(VALID_STATUSES))}"
+                }
+            ),
+            400,
+        )
+
     query = Asset.query
 
     if search:
@@ -119,6 +139,18 @@ def export_assets():
     )
 
 
+VALID_ASSET_TYPES = {"workstation", "server", "network", "peripheral"}
+VALID_STATUSES = {"active", "inactive", "retired"}
+MAX_STRING_LENGTH = 200
+
+
+def sanitize_string(value, max_length=MAX_STRING_LENGTH):
+    """Strip whitespace and truncate to max length."""
+    if not isinstance(value, str):
+        return value
+    return value.strip()[:max_length]
+
+
 @assets_bp.route("/assets", methods=["POST"])
 def create_asset():
     data = request.get_json()
@@ -130,18 +162,50 @@ def create_asset():
     if missing:
         return jsonify({"error": f'Missing required fields: {", ".join(missing)}'}), 400
 
-    name = data["name"]
-    asset_type = data["asset_type"]
+    name = sanitize_string(data["name"])
+    asset_type = data["asset_type"].strip().lower()
     client_id = data["client_id"]
+
+    if not name:
+        return jsonify({"error": "Name cannot be empty"}), 400
+
+    if asset_type not in VALID_ASSET_TYPES:
+        return (
+            jsonify(
+                {
+                    "error": f"Invalid asset type. Must be one of: {', '.join(sorted(VALID_ASSET_TYPES))}"
+                }
+            ),
+            400,
+        )
+
+    if not isinstance(client_id, int):
+        return jsonify({"error": "client_id must be an integer"}), 400
+
+    from app.models import Client
+
+    if not Client.query.get(client_id):
+        return jsonify({"error": f"Client with id {client_id} not found"}), 404
+
+    status = data.get("status", "active").strip().lower()
+    if status not in VALID_STATUSES:
+        return (
+            jsonify(
+                {
+                    "error": f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}"
+                }
+            ),
+            400,
+        )
 
     asset = Asset(
         name=name,
         asset_type=asset_type,
         client_id=client_id,
-        serial_number=data.get("serial_number"),
-        assigned_to=data.get("assigned_to"),
-        notes=data.get("notes"),
-        status=data.get("status", "active"),
+        serial_number=sanitize_string(data.get("serial_number")),
+        assigned_to=sanitize_string(data.get("assigned_to")),
+        notes=sanitize_string(data.get("notes"), max_length=2000),
+        status=status,
     )
     db.session.add(asset)
     db.session.commit()
@@ -156,16 +220,38 @@ def update_asset(asset_id):
         return jsonify({"error": "Request body must be JSON"}), 400
 
     if "name" in data:
-        asset.name = data["name"]
+        name = sanitize_string(data["name"])
+        if not name:
+            return jsonify({"error": "Name cannot be empty"}), 400
+        asset.name = name
     if "asset_type" in data:
-        asset.asset_type = data["asset_type"]
+        asset_type = data["asset_type"].strip().lower()
+        if asset_type not in VALID_ASSET_TYPES:
+            return (
+                jsonify(
+                    {
+                        "error": f"Invalid asset type. Must be one of: {', '.join(sorted(VALID_ASSET_TYPES))}"
+                    }
+                ),
+                400,
+            )
+        asset.asset_type = asset_type
     if "serial_number" in data:
-        asset.serial_number = data["serial_number"]
+        asset.serial_number = sanitize_string(data["serial_number"])
     if "assigned_to" in data:
-        asset.assigned_to = data["assigned_to"]
+        asset.assigned_to = sanitize_string(data["assigned_to"])
     if "notes" in data:
-        asset.notes = data["notes"]
+        asset.notes = sanitize_string(data["notes"], max_length=2000)
     if "client_id" in data:
+        if not isinstance(data["client_id"], int):
+            return jsonify({"error": "client_id must be an integer"}), 400
+        from app.models import Client
+
+        if not Client.query.get(data["client_id"]):
+            return (
+                jsonify({"error": f"Client with id {data['client_id']} not found"}),
+                404,
+            )
         asset.client_id = data["client_id"]
 
     db.session.commit()

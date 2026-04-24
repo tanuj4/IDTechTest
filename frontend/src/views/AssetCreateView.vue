@@ -1,8 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { createAsset } from '../api/index.js'
-import { getClients } from '../api/index.js'
+import { createAsset, getClients } from '../api/index.js'
 
 const router = useRouter()
 const clients = ref([])
@@ -19,19 +18,22 @@ const form = ref({
   status: 'active',
 })
 
+const submitted = ref(false)
+
 onMounted(async () => {
   const data = await getClients()
   clients.value = data.clients
 })
 
 const handleSubmit = async () => {
+  submitted.value = true
+  if (!form.value.name || !form.value.asset_type || !form.value.client_id) {
+    return
+  }
   saving.value = true
   error.value = null
   try {
     const payload = { ...form.value }
-    if (!payload.name) delete payload.name
-    if (!payload.asset_type) delete payload.asset_type
-    if (!payload.client_id) delete payload.client_id
     if (!payload.serial_number) delete payload.serial_number
     if (!payload.assigned_to) delete payload.assigned_to
     if (!payload.notes) delete payload.notes
@@ -59,26 +61,29 @@ const handleSubmit = async () => {
     <form @submit.prevent="handleSubmit" style="max-width: 540px">
       <div class="mb-3">
         <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
-        <input v-model="form.name" type="text" class="form-control" />
+        <input v-model="form.name" type="text" class="form-control" :class="{ 'is-invalid': submitted && !form.name }" placeholder="e.g. Dell Latitude 5540" />
+        <div v-if="submitted && !form.name" class="invalid-feedback">Name is required.</div>
       </div>
 
       <div class="mb-3">
         <label class="form-label fw-semibold">Type <span class="text-danger">*</span></label>
-        <select v-model="form.asset_type" class="form-select">
+        <select v-model="form.asset_type" class="form-select" :class="{ 'is-invalid': submitted && !form.asset_type }">
           <option value="">Select a type…</option>
           <option value="workstation">Workstation</option>
           <option value="server">Server</option>
           <option value="network">Network</option>
           <option value="peripheral">Peripheral</option>
         </select>
+        <div v-if="submitted && !form.asset_type" class="invalid-feedback">Type is required.</div>
       </div>
 
       <div class="mb-3">
         <label class="form-label fw-semibold">Client <span class="text-danger">*</span></label>
-        <select v-model="form.client_id" class="form-select">
+        <select v-model="form.client_id" class="form-select" :class="{ 'is-invalid': submitted && !form.client_id }">
           <option value="">Select a client…</option>
           <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
         </select>
+        <div v-if="submitted && !form.client_id" class="invalid-feedback">Client is required.</div>
       </div>
 
       <div class="mb-3">

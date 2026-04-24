@@ -23,10 +23,24 @@ def create_client():
     if not data or not data.get("name", "").strip():
         return jsonify({"error": "Client name is required"}), 400
 
+    name = data["name"].strip()[:200]
+    contact_email = data.get("contact_email")
+    phone = data.get("phone")
+
+    if contact_email and not isinstance(contact_email, str):
+        return jsonify({"error": "contact_email must be a string"}), 400
+    if contact_email:
+        contact_email = contact_email.strip()[:200]
+
+    if phone and not isinstance(phone, str):
+        return jsonify({"error": "phone must be a string"}), 400
+    if phone:
+        phone = phone.strip()[:50]
+
     client = Client(
-        name=data["name"].strip(),
-        contact_email=data.get("contact_email"),
-        phone=data.get("phone"),
+        name=name,
+        contact_email=contact_email,
+        phone=phone,
     )
     db.session.add(client)
     db.session.commit()
@@ -41,11 +55,20 @@ def update_client(client_id):
         return jsonify({"error": "Request body must be JSON"}), 400
 
     if "name" in data:
-        client.name = data["name"]
+        name = data["name"].strip()[:200] if isinstance(data["name"], str) else ""
+        if not name:
+            return jsonify({"error": "Client name cannot be empty"}), 400
+        client.name = name
     if "contact_email" in data:
-        client.contact_email = data["contact_email"]
+        client.contact_email = (
+            data["contact_email"].strip()[:200]
+            if isinstance(data["contact_email"], str)
+            else None
+        )
     if "phone" in data:
-        client.phone = data["phone"]
+        client.phone = (
+            data["phone"].strip()[:50] if isinstance(data["phone"], str) else None
+        )
 
     db.session.commit()
     return jsonify(client.to_dict())

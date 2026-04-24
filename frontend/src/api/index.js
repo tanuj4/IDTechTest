@@ -31,6 +31,8 @@ export const decommissionAsset = (id) =>
 
 export const deleteAsset = (id) => api.delete(`/assets/${id}`).then((r) => r.data)
 
+export const getAssetAudit = (id) => api.get(`/assets/${id}/audit`).then((r) => r.data)
+
 // --- Clients ---
 
 export const getClients = () => api.get('/clients').then((r) => r.data)

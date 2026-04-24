@@ -3,7 +3,7 @@ import csv
 import io
 from datetime import datetime, timezone
 from app import db
-from app.models import Asset
+from app.models import Asset, AuditLog
 
 assets_bp = Blueprint("assets", __name__, url_prefix="/api")
 
@@ -48,6 +48,17 @@ def list_assets():
 def get_asset(asset_id):
     asset = Asset.query.get_or_404(asset_id)
     return jsonify(asset.to_dict())
+
+
+@assets_bp.route("/assets/<int:asset_id>/audit", methods=["GET"])
+def get_asset_audit(asset_id):
+    asset = Asset.query.get_or_404(asset_id)
+    logs = (
+        AuditLog.query.filter_by(asset_id=asset_id)
+        .order_by(AuditLog.timestamp.desc())
+        .all()
+    )
+    return jsonify({"audit_logs": [log.to_dict() for log in logs]})
 
 
 @assets_bp.route("/assets/export", methods=["GET"])
@@ -172,12 +183,22 @@ def delete_asset(asset_id):
 @assets_bp.route("/assets/<int:asset_id>/toggle", methods=["POST"])
 def toggle_asset_status(asset_id):
     asset = Asset.query.get_or_404(asset_id)
+    previous_status = asset.status
 
     if asset.status == "active":
         asset.status = "inactive"
     elif asset.status == "inactive":
         asset.status = "active"
     # retired assets cannot be toggled further
+
+    if asset.status != previous_status:
+        log = AuditLog(
+            asset_id=asset.id,
+            previous_status=previous_status,
+            new_status=asset.status,
+            requester_ip=request.remote_addr,
+        )
+        db.session.add(log)
 
     db.session.commit()
     return jsonify(asset.to_dict())
@@ -188,6 +209,16 @@ def decommission_asset(asset_id):
     asset = Asset.query.get_or_404(asset_id)
     if asset.status == "retired":
         return jsonify({"error": "Asset is already retired"}), 400
+    previous_status = asset.status
     asset.status = "retired"
+
+    log = AuditLog(
+        asset_id=asset.id,
+        previous_status=previous_status,
+        new_status="retired",
+        requester_ip=request.remote_addr,
+    )
+    db.session.add(log)
+
     db.session.commit()
     return jsonify(asset.to_dict())

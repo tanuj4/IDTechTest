@@ -1,12 +1,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getAsset, toggleAsset, decommissionAsset, deleteAsset } from '../api/index.js'
+import { getAsset, getAssetAudit, toggleAsset, decommissionAsset, deleteAsset } from '../api/index.js'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const route = useRoute()
 const router = useRouter()
 const asset = ref(null)
+const auditLogs = ref([])
 const loading = ref(true)
 const error = ref(null)
 
@@ -14,6 +15,8 @@ const loadAsset = async () => {
   loading.value = true
   try {
     asset.value = await getAsset(route.params.id)
+    const auditData = await getAssetAudit(route.params.id)
+    auditLogs.value = auditData.audit_logs
   } catch (err) {
     error.value = err.response?.status === 404 ? 'Asset not found.' : 'Failed to load asset.'
   } finally {
@@ -111,11 +114,35 @@ onMounted(loadAsset)
         </div>
       </div>
 
-      <!--
-        Feature 2: Audit Log
-        Add a section below that fetches and displays the status change history
-        for this asset from GET /api/assets/<id>/audit.
-      -->
+      <div class="card mb-4">
+        <div class="card-header fw-semibold">
+          Audit Log
+          <span v-if="auditLogs.length" class="badge bg-secondary ms-1">{{ auditLogs.length }}</span>
+        </div>
+        <div v-if="auditLogs.length === 0" class="card-body text-muted">
+          No status changes recorded.
+        </div>
+        <div v-else class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Previous Status</th>
+                <th>New Status</th>
+                <th>Requester IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in auditLogs" :key="log.id">
+                <td>{{ formatDate(log.timestamp) }}</td>
+                <td><StatusBadge :status="log.previous_status" /></td>
+                <td><StatusBadge :status="log.new_status" /></td>
+                <td><code>{{ log.requester_ip || '—' }}</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <div class="d-flex gap-2 flex-wrap">
         <button

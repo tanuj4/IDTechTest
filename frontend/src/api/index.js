@@ -11,8 +11,8 @@ export const getAssets = (params = {}) => {
   const query = new URLSearchParams()
   if (params.search) query.set('search', params.search)
   if (params.page) query.set('page', params.page)
-  // NOTE: 'type' and 'status' filters are intentionally NOT wired up here yet.
-  // The backend already supports them — see Feature 3 in the README.
+  if (params.type) query.set('type', params.type)
+  if (params.status) query.set('status', params.status)
   return api.get(`/assets?${query}`).then((r) => r.data)
 }
 

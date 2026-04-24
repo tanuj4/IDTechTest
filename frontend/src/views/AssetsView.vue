@@ -1,22 +1,43 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { getAssets, toggleAsset, deleteAsset } from '../api/index.js'
 import AssetTable from '../components/AssetTable.vue'
 
+const route = useRoute()
+const router = useRouter()
+
 const assets = ref([])
 const total = ref(0)
-const currentPage = ref(1)
+const currentPage = ref(parseInt(route.query.page) || 1)
 const totalPages = ref(1)
-const search = ref('')
+const search = ref(route.query.search || '')
+const filterType = ref(route.query.type || '')
+const filterStatus = ref(route.query.status || '')
 const loading = ref(false)
 const exporting = ref(false)
 const error = ref(null)
+
+const assetTypes = ['workstation', 'server', 'network', 'peripheral']
+const statuses = ['active', 'inactive', 'retired']
+
+const activeFilterCount = computed(() => {
+  return [search.value, filterType.value, filterStatus.value].filter(Boolean).length
+})
+
+const clearFilters = () => {
+  search.value = ''
+  filterType.value = ''
+  filterStatus.value = ''
+}
 
 const formatDate = (dateStr) => dateStr ? dateStr.split('T')[0] : 'N/A'
 
 const exportUrl = computed(() => {
   const params = new URLSearchParams()
   if (search.value) params.set('search', search.value)
+  if (filterType.value) params.set('type', filterType.value)
+  if (filterStatus.value) params.set('status', filterStatus.value)
   const qs = params.toString()
   return `/api/assets/export${qs ? '?' + qs : ''}`
 })
@@ -24,8 +45,15 @@ const exportUrl = computed(() => {
 const fetchAssets = async () => {
   loading.value = true
   error.value = null
+
+  const query = {}
+  if (search.value) query.search = search.value
+  if (filterType.value) query.type = filterType.value
+  if (filterStatus.value) query.status = filterStatus.value
+  router.replace({ query: { ...query, ...(currentPage.value > 1 ? { page: currentPage.value } : {}) } })
+
   try {
-    const data = await getAssets({ search: search.value, page: currentPage.value })
+    const data = await getAssets({ search: search.value, page: currentPage.value, type: filterType.value, status: filterStatus.value })
     assets.value = data.assets.map((a) => ({
       ...a,
       last_seen_formatted: formatDate(a.last_seen),
@@ -75,7 +103,7 @@ const goToPage = (page) => {
   fetchAssets()
 }
 
-watch(search, () => {
+watch([search, filterType, filterStatus], () => {
   currentPage.value = 1
   fetchAssets()
 })
@@ -121,11 +149,23 @@ onMounted(fetchAssets)
               />
             </div>
           </div>
-          <!--
-            Feature 3: Add "Asset Type" and "Status" filter dropdowns here.
-            The backend already accepts ?type= and ?status= query params on GET /api/assets.
-            Wire them up so selecting a filter re-fetches the list reactively.
-          -->
+          <div class="col-auto">
+            <select v-model="filterType" class="form-select form-select-sm">
+              <option value="">All Types</option>
+              <option v-for="t in assetTypes" :key="t" :value="t">{{ t.charAt(0).toUpperCase() + t.slice(1) }}</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <select v-model="filterStatus" class="form-select form-select-sm">
+              <option value="">All Statuses</option>
+              <option v-for="s in statuses" :key="s" :value="s">{{ s.charAt(0).toUpperCase() + s.slice(1) }}</option>
+            </select>
+          </div>
+          <div v-if="activeFilterCount > 0" class="col-auto">
+            <button class="btn btn-sm btn-outline-danger" @click="clearFilters" title="Clear all filters">
+              <i class="bi bi-funnel me-1"></i>Clear Filters
+            </button>
+          </div>
         </div>
       </div>
     </div>

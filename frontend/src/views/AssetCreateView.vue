@@ -6,6 +6,7 @@ import { createAsset, getClients } from '../api/index.js'
 const router = useRouter()
 const clients = ref([])
 const saving = ref(false)
+const loadingClients = ref(true)
 const error = ref(null)
 
 const form = ref({
@@ -21,8 +22,14 @@ const form = ref({
 const submitted = ref(false)
 
 onMounted(async () => {
-  const data = await getClients()
-  clients.value = data.clients
+  try {
+    const data = await getClients()
+    clients.value = data.clients
+  } catch (err) {
+    error.value = 'Failed to load clients.'
+  } finally {
+    loadingClients.value = false
+  }
 })
 
 const handleSubmit = async () => {
@@ -79,8 +86,8 @@ const handleSubmit = async () => {
 
       <div class="mb-3">
         <label class="form-label fw-semibold">Client <span class="text-danger">*</span></label>
-        <select v-model="form.client_id" class="form-select" :class="{ 'is-invalid': submitted && !form.client_id }">
-          <option value="">Select a client…</option>
+        <select v-model="form.client_id" class="form-select" :class="{ 'is-invalid': submitted && !form.client_id }" :disabled="loadingClients">
+          <option value="">{{ loadingClients ? 'Loading clients…' : 'Select a client…' }}</option>
           <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option>
         </select>
         <div v-if="submitted && !form.client_id" class="invalid-feedback">Client is required.</div>

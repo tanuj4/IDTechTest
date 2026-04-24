@@ -2,10 +2,17 @@
 import { ref, onMounted } from 'vue'
 import { getClients, deleteClient } from '../api/index.js'
 import ClientCard from '../components/ClientCard.vue'
+import ToastNotification from '../components/ToastNotification.vue'
+import ConfirmModal from '../components/ConfirmModal.vue'
+import { useToast } from '../composables/useToast.js'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const clients = ref([])
 const loading = ref(true)
 const error = ref(null)
+
+const { toast, showToast, closeToast } = useToast()
+const { confirmModal, showConfirm, handleConfirm, cancelConfirm } = useConfirm()
 
 const fetchClients = async () => {
   loading.value = true
@@ -22,14 +29,21 @@ const fetchClients = async () => {
 }
 
 const handleDelete = async (client) => {
-  if (!confirm(`Delete "${client.name}"?`)) return
-  try {
-    await deleteClient(client.id)
-    fetchClients()
-  } catch (err) {
-    const msg = err.response?.data?.error || 'Could not delete client.'
-    alert(msg)
-  }
+  showConfirm({
+    title: 'Delete Client',
+    message: `Delete "${client.name}"? This cannot be undone.`,
+    confirmText: 'Delete',
+    confirmClass: 'btn-danger',
+    onConfirm: async () => {
+      try {
+        await deleteClient(client.id)
+        showToast(`${client.name} deleted`, 'warning')
+        fetchClients()
+      } catch (err) {
+        showToast(err.response?.data?.error || 'Could not delete client.', 'danger')
+      }
+    },
+  })
 }
 
 onMounted(fetchClients)
@@ -59,5 +73,22 @@ onMounted(fetchClients)
         <ClientCard :client="client" @delete="handleDelete" />
       </div>
     </div>
+
+    <ToastNotification
+      :show="toast.show"
+      :message="toast.message"
+      :type="toast.type"
+      @close="closeToast"
+    />
+
+    <ConfirmModal
+      :show="confirmModal.show"
+      :title="confirmModal.title"
+      :message="confirmModal.message"
+      :confirm-text="confirmModal.confirmText"
+      :confirm-class="confirmModal.confirmClass"
+      @confirm="handleConfirm"
+      @cancel="cancelConfirm"
+    />
   </div>
 </template>

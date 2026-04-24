@@ -17,7 +17,7 @@ def list_assets():
     query = Asset.query
 
     if search:
-        query = query.filter(Asset.name == search)
+        query = query.filter(Asset.name.ilike(f"%{search}%"))
 
     if asset_type:
         query = query.filter(Asset.asset_type == asset_type)
@@ -27,7 +27,7 @@ def list_assets():
 
     total = query.count()
 
-    offset = page * PER_PAGE
+    offset = (page - 1) * PER_PAGE
     assets = query.order_by(Asset.name).offset(offset).limit(PER_PAGE).all()
 
     return jsonify(
@@ -115,7 +115,7 @@ def toggle_asset_status(asset_id):
     if asset.status == "active":
         asset.status = "inactive"
     elif asset.status == "inactive":
-        asset.status = "retired"
+        asset.status = "active"
     # retired assets cannot be toggled further
 
     db.session.commit()

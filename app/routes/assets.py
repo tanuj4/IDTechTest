@@ -1,4 +1,6 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response
+import csv
+import io
 from app import db
 from app.models import Asset
 
@@ -45,6 +47,63 @@ def list_assets():
 def get_asset(asset_id):
     asset = Asset.query.get_or_404(asset_id)
     return jsonify(asset.to_dict())
+
+
+@assets_bp.route("/assets/export", methods=["GET"])
+def export_assets():
+    search = request.args.get("search", "").strip()
+    asset_type = request.args.get("type", "").strip()
+    status = request.args.get("status", "").strip()
+
+    query = Asset.query
+
+    if search:
+        query = query.filter(Asset.name.ilike(f"%{search}%"))
+    if asset_type:
+        query = query.filter(Asset.asset_type == asset_type)
+    if status:
+        query = query.filter(Asset.status == status)
+
+    assets = query.order_by(Asset.name).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "ID",
+            "Name",
+            "Type",
+            "Serial Number",
+            "Status",
+            "Client",
+            "Assigned To",
+            "Last Seen",
+            "Notes",
+            "Created At",
+        ]
+    )
+
+    for a in assets:
+        writer.writerow(
+            [
+                a.id,
+                a.name,
+                a.asset_type,
+                a.serial_number or "",
+                a.status,
+                a.client.name if a.client else "",
+                a.assigned_to or "",
+                a.last_seen.isoformat() if a.last_seen else "",
+                a.notes or "",
+                a.created_at.isoformat(),
+            ]
+        )
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=assets.csv"},
+    )
 
 
 @assets_bp.route("/assets", methods=["POST"])

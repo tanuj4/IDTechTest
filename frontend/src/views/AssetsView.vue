@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getAssets, toggleAsset, deleteAsset } from '../api/index.js'
 import AssetTable from '../components/AssetTable.vue'
 
@@ -12,6 +12,13 @@ const loading = ref(false)
 const error = ref(null)
 
 const formatDate = (dateStr) => dateStr ? dateStr.split('T')[0] : 'N/A'
+
+const exportUrl = computed(() => {
+  const params = new URLSearchParams()
+  if (search.value) params.set('search', search.value)
+  const qs = params.toString()
+  return `/api/assets/export${qs ? '?' + qs : ''}`
+})
 
 const fetchAssets = async () => {
   loading.value = true
@@ -66,6 +73,13 @@ onMounted(fetchAssets)
       <router-link to="/assets/new" class="btn btn-primary ms-auto">
         <i class="bi bi-plus-lg me-1"></i>Add Asset
       </router-link>
+      <a
+        :href="exportUrl"
+        class="btn btn-outline-secondary ms-2"
+        download
+      >
+        <i class="bi bi-download me-1"></i>Export CSV
+      </a>
     </div>
 
     <!-- Search -->

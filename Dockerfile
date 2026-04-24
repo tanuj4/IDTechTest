@@ -16,8 +16,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
-COPY config.py run.py seed.py ./
+COPY config.py run.py seed.py entrypoint.sh ./
+
+# Copy built frontend from stage 1 into Flask static folder
+COPY --from=frontend-builder /frontend/dist ./app/static/dist/
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "run:app"]
+CMD ["sh", "entrypoint.sh"]
